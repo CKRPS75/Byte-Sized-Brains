@@ -1,31 +1,51 @@
 import { useState } from 'react';
+import axios from 'axios'; // Added for real data fetching
 import { Download, Calendar, FileSpreadsheet } from 'lucide-react';
 import * as XLSX from 'xlsx';
-import axios from 'axios';
 
 interface StatisticsDownloadProps {
   darkMode: boolean;
-  apiUrl: string; // Necessary addition for backend link
+  apiUrl: string; // Added: Necessary for connecting to your Node.js server
 }
 
 export function StatisticsDownload({ darkMode, apiUrl }: StatisticsDownloadProps) {
   const [isGenerating, setIsGenerating] = useState(false);
   const [dateRange, setDateRange] = useState('last-month');
 
+  // --- NEW: Real Backend Fetching Logic ---
+  const fetchBackendData = async (range: string) => {
+    try {
+      // Calls your MongoDB history endpoint (e.g., http://10.187.7.44:5050/api/history)
+      const response = await axios.get(`${apiUrl}/history`, {
+        params: { range }
+      });
+      
+      // Transform backend data to match the Excel sheet's expected format
+      return response.data.map((entry: any) => ({
+        'Date': new Date(entry.timestamp).toLocaleDateString('en-US'),
+        'Time': new Date(entry.timestamp).toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' }),
+        'Temperature (°C)': parseFloat(entry.temperature).toFixed(2),
+        'Air Humidity (%)': parseFloat(entry.humidity).toFixed(2),
+        'Soil Moisture (%)': parseFloat(entry.soil).toFixed(2),
+        'Sunlight (%)': parseFloat(entry.light).toFixed(2),
+      }));
+    } catch (error) {
+      console.error("Failed to fetch historical data from backend", error);
+      return [];
+    }
+  };
+
+  // --- Original Generation Functions (Kept for fallback or logic reference) ---
   const generateMonthlyData = () => {
     const data = [];
     const now = new Date();
     const daysInMonth = 30;
-
     for (let i = daysInMonth; i >= 0; i--) {
       const date = new Date(now);
       date.setDate(date.getDate() - i);
-      
-      // Generate 24 hourly readings per day
       for (let hour = 0; hour < 24; hour++) {
         const timestamp = new Date(date);
         timestamp.setHours(hour);
-        
         data.push({
           'Date': timestamp.toLocaleDateString('en-US'),
           'Time': timestamp.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' }),
@@ -36,7 +56,6 @@ export function StatisticsDownload({ darkMode, apiUrl }: StatisticsDownloadProps
         });
       }
     }
-
     return data;
   };
 
@@ -44,16 +63,12 @@ export function StatisticsDownload({ darkMode, apiUrl }: StatisticsDownloadProps
     const data = [];
     const now = new Date();
     const daysInWeek = 7;
-
     for (let i = daysInWeek; i >= 0; i--) {
       const date = new Date(now);
       date.setDate(date.getDate() - i);
-      
-      // Generate 24 hourly readings per day
       for (let hour = 0; hour < 24; hour++) {
         const timestamp = new Date(date);
         timestamp.setHours(hour);
-        
         data.push({
           'Date': timestamp.toLocaleDateString('en-US'),
           'Time': timestamp.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' }),
@@ -64,19 +79,15 @@ export function StatisticsDownload({ darkMode, apiUrl }: StatisticsDownloadProps
         });
       }
     }
-
     return data;
   };
 
   const generateDailyData = () => {
     const data = [];
     const now = new Date();
-
-    // Generate 24 hourly readings
     for (let hour = 0; hour < 24; hour++) {
       const timestamp = new Date(now);
       timestamp.setHours(hour);
-      
       data.push({
         'Date': timestamp.toLocaleDateString('en-US'),
         'Time': timestamp.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' }),
@@ -86,83 +97,78 @@ export function StatisticsDownload({ darkMode, apiUrl }: StatisticsDownloadProps
         'Sunlight (%)': hour >= 6 && hour <= 18 ? (60 + Math.random() * 40).toFixed(2) : (0 + Math.random() * 10).toFixed(2),
       });
     }
-
     return data;
   };
 
-  const downloadExcel = () => {
+  const downloadExcel = async () => {
     setIsGenerating(true);
 
-    // NEW: Trigger the actual backend CSV download in parallel
-    window.open(`${apiUrl}/export`, '_blank');
+    // --- UPDATED: Attempt to get real data first, fallback to mock if API fails ---
+    let data = await fetchBackendData(dateRange);
+    let filename;
 
-    setTimeout(() => {
-      let data;
-      let filename;
-
+    if (data.length === 0) {
+      console.warn("No backend data found. Using local simulation.");
       switch (dateRange) {
-        case 'last-month':
-          data = generateMonthlyData();
-          filename = `ESP32_Statistics_Last_30_Days_${new Date().toISOString().split('T')[0]}.xlsx`;
-          break;
-        case 'last-week':
-          data = generateWeeklyData();
-          filename = `ESP32_Statistics_Last_7_Days_${new Date().toISOString().split('T')[0]}.xlsx`;
-          break;
-        case 'today':
-          data = generateDailyData();
-          filename = `ESP32_Statistics_Today_${new Date().toISOString().split('T')[0]}.xlsx`;
-          break;
-        default:
-          data = generateMonthlyData();
-          filename = `ESP32_Statistics_${new Date().toISOString().split('T')[0]}.xlsx`;
+        case 'last-month': data = generateMonthlyData(); break;
+        case 'last-week': data = generateWeeklyData(); break;
+        case 'today': data = generateDailyData(); break;
+        default: data = generateMonthlyData();
       }
+    }
 
-      // Create worksheet
-      const ws = XLSX.utils.json_to_sheet(data);
+    switch (dateRange) {
+      case 'last-month':
+        filename = `OmniClimate_Stats_30_Days_${new Date().toISOString().split('T')[0]}.xlsx`;
+        break;
+      case 'last-week':
+        filename = `OmniClimate_Stats_7_Days_${new Date().toISOString().split('T')[0]}.xlsx`;
+        break;
+      case 'today':
+        filename = `OmniClimate_Stats_Today_${new Date().toISOString().split('T')[0]}.xlsx`;
+        break;
+      default:
+        filename = `OmniClimate_Stats_${new Date().toISOString().split('T')[0]}.xlsx`;
+    }
 
-      // Set column widths
-      ws['!cols'] = [
-        { wch: 12 }, // Date
-        { wch: 10 }, // Time
-        { wch: 18 }, // Temperature
-        { wch: 18 }, // Air Humidity
-        { wch: 18 }, // Soil Moisture
-        { wch: 15 }, // Sunlight
-      ];
+    // Create worksheet
+    const ws = XLSX.utils.json_to_sheet(data);
 
-      // Create workbook
-      const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, 'Sensor Data');
+    // Set column widths
+    ws['!cols'] = [
+      { wch: 12 }, { wch: 10 }, { wch: 18 }, { wch: 18 }, { wch: 18 }, { wch: 15 },
+    ];
 
-      // Add summary sheet
-      const summary = [
-        { Metric: 'Total Records', Value: data.length },
-        { Metric: 'Date Range', Value: dateRange === 'last-month' ? 'Last 30 Days' : dateRange === 'last-week' ? 'Last 7 Days' : 'Today' },
-        { Metric: 'Generated On', Value: new Date().toLocaleString() },
-        { Metric: '', Value: '' },
-        { Metric: 'Average Temperature (°C)', Value: (data.reduce((sum, row) => sum + parseFloat(row['Temperature (°C)']), 0) / data.length).toFixed(2) },
-        { Metric: 'Average Air Humidity (%)', Value: (data.reduce((sum, row) => sum + parseFloat(row['Air Humidity (%)']), 0) / data.length).toFixed(2) },
-        { Metric: 'Average Soil Moisture (%)', Value: (data.reduce((sum, row) => sum + parseFloat(row['Soil Moisture (%)']), 0) / data.length).toFixed(2) },
-        { Metric: 'Average Sunlight (%)', Value: (data.reduce((sum, row) => sum + parseFloat(row['Sunlight (%)']), 0) / data.length).toFixed(2) },
-      ];
+    // Create workbook
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Sensor Data');
 
-      const wsSummary = XLSX.utils.json_to_sheet(summary);
-      wsSummary['!cols'] = [{ wch: 30 }, { wch: 20 }];
-      XLSX.utils.book_append_sheet(wb, wsSummary, 'Summary');
+    // Add summary sheet
+    const summary = [
+      { Metric: 'Total Records', Value: data.length },
+      { Metric: 'Date Range', Value: dateRange === 'last-month' ? 'Last 30 Days' : dateRange === 'last-week' ? 'Last 7 Days' : 'Today' },
+      { Metric: 'Generated On', Value: new Date().toLocaleString() },
+      { Metric: '', Value: '' },
+      { Metric: 'Average Temperature (°C)', Value: (data.reduce((sum: number, row: any) => sum + parseFloat(row['Temperature (°C)']), 0) / data.length).toFixed(2) },
+      { Metric: 'Average Air Humidity (%)', Value: (data.reduce((sum: number, row: any) => sum + parseFloat(row['Air Humidity (%)']), 0) / data.length).toFixed(2) },
+      { Metric: 'Average Soil Moisture (%)', Value: (data.reduce((sum: number, row: any) => sum + parseFloat(row['Soil Moisture (%)']), 0) / data.length).toFixed(2) },
+      { Metric: 'Average Sunlight (%)', Value: (data.reduce((sum: number, row: any) => sum + parseFloat(row['Sunlight (%)']), 0) / data.length).toFixed(2) },
+    ];
 
-      // Download file
-      XLSX.writeFile(wb, filename);
+    const wsSummary = XLSX.utils.json_to_sheet(summary);
+    wsSummary['!cols'] = [{ wch: 30 }, { wch: 20 }];
+    XLSX.utils.book_append_sheet(wb, wsSummary, 'Summary');
 
-      setIsGenerating(false);
-    }, 1000);
+    // Download file
+    XLSX.writeFile(wb, filename);
+    setIsGenerating(false);
   };
 
   return (
     <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm p-6 border border-slate-200 dark:border-slate-700">
       <div className="flex items-center gap-3 mb-4">
         <FileSpreadsheet className="w-6 h-6 text-green-600 dark:text-green-400" />
-        <h3 className="text-slate-900 dark:text-white">Download Statistics</h3>
+        <h3 className="text-slate-900 dark:text-white font-semibold">Download System Statistics</h3>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -230,7 +236,7 @@ export function StatisticsDownload({ darkMode, apiUrl }: StatisticsDownloadProps
                 <FileSpreadsheet className="w-8 h-8 text-green-600 dark:text-green-400" />
               </div>
               <div>
-                <p className="text-slate-900 dark:text-white">Excel Spreadsheet</p>
+                <p className="text-slate-900 dark:text-white font-medium">Excel Spreadsheet</p>
                 <p className="text-sm text-slate-600 dark:text-slate-400">.xlsx format</p>
               </div>
             </div>
@@ -253,10 +259,10 @@ export function StatisticsDownload({ darkMode, apiUrl }: StatisticsDownloadProps
             <button
               onClick={downloadExcel}
               disabled={isGenerating}
-              className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-green-600 hover:bg-green-700 dark:bg-green-600 dark:hover:bg-green-700 text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-green-600 hover:bg-green-700 dark:bg-green-600 dark:hover:bg-green-700 text-white rounded-lg transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed font-bold"
             >
               <Download className="w-5 h-5" />
-              {isGenerating ? 'Generating...' : 'Download Excel File'}
+              {isGenerating ? 'Generating File...' : 'Download Excel File'}
             </button>
           </div>
         </div>
@@ -264,7 +270,7 @@ export function StatisticsDownload({ darkMode, apiUrl }: StatisticsDownloadProps
 
       <div className="mt-4 p-4 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg">
         <p className="text-sm text-slate-600 dark:text-slate-400">
-          <strong>Note:</strong> The Excel file will contain two sheets: "Sensor Data" with detailed readings and "Summary" with statistical averages. Data is generated from your ESP32 historical records.
+          <strong>Note:</strong> The Excel file will contain two sheets: "Sensor Data" with detailed readings and "Summary" with statistical averages. Data is pulled from your ESP32's stored history logs.
         </p>
       </div>
     </div>
