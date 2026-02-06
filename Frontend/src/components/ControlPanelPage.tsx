@@ -1,47 +1,63 @@
-import { ControlPanel } from './ControlPanel';
-import { ParameterSettings } from './ParameterSettings';
+import { Activity, Sliders, FileBarChart, Sprout } from 'lucide-react';
 
-interface ControlPanelPageProps {
+interface NavigationProps {
+  currentPage: 'live-feed' | 'control-panel' | 'report' | 'crop-presets';
+  onPageChange: (page: 'live-feed' | 'control-panel' | 'report' | 'crop-presets') => void;
   darkMode: boolean;
-  config: any;   // Added to receive the live configuration from MongoDB
-  apiUrl: string; // Added to receive the backend endpoint URL
+  userRole: string; // Added prop for Role-Based Access Control
 }
 
-export function ControlPanelPage({ darkMode, config, apiUrl }: ControlPanelPageProps) {
+export function Navigation({ currentPage, onPageChange, darkMode, userRole }: NavigationProps) {
+  const navItems = [
+    {
+      id: 'live-feed' as const,
+      label: 'Live Feed',
+      icon: <Activity className="w-5 h-5" />,
+      allowedRoles: ['manager', 'farmer'], // Everyone sees the live feed
+    },
+    {
+      id: 'control-panel' as const,
+      label: 'Control Panel',
+      icon: <Sliders className="w-5 h-5" />,
+      allowedRoles: ['manager', 'farmer'], // Everyone can access control
+    },
+    {
+      id: 'crop-presets' as const,
+      label: 'Crop Presets',
+      icon: <Sprout className="w-5 h-5" />,
+      allowedRoles: ['manager'], // Only the manager can set presets
+    },
+    {
+      id: 'report' as const,
+      label: 'Report Download',
+      icon: <FileBarChart className="w-5 h-5" />,
+      allowedRoles: ['manager'], // Only the manager can download reports
+    },
+  ];
+
   return (
-    <div className="space-y-8">
-      {/* Manual Device Control */}
-      <div>
-        <h2 className="text-slate-900 dark:text-white mb-4">Manual Device Control</h2>
-        {/* Passing config and apiUrl to enable real-time hardware toggles */}
-        <ControlPanel darkMode={darkMode} config={config} apiUrl={apiUrl} />
-      </div>
+    <nav className="flex gap-2 overflow-x-auto">
+      {navItems.map((item) => {
+        // --- ROLE FILTER LOGIC ---
+        // If the current user's role is not in the allowedRoles list, do not render this button
+        if (!item.allowedRoles.includes(userRole)) return null;
 
-      {/* Parameter Settings */}
-      <div>
-        <h2 className="text-slate-900 dark:text-white mb-4">Target Parameter Settings</h2>
-        {/* Passing config and apiUrl to update dynamic thresholds in the database */}
-        <ParameterSettings darkMode={darkMode} config={config} apiUrl={apiUrl} />
-      </div>
-
-      {/* Information Panel */}
-      <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm p-6 border border-slate-200 dark:border-slate-700">
-        <h3 className="text-slate-900 dark:text-white mb-3">How It Works</h3>
-        <div className="space-y-3 text-sm text-slate-600 dark:text-slate-400">
-          <div>
-            <h4 className="text-slate-800 dark:text-slate-200 mb-1">Manual Control</h4>
-            <p>Toggle individual devices on/off directly. Commands are updated in MongoDB and picked up by your ESP32 during its next sync.</p>
-          </div>
-          <div>
-            <h4 className="text-slate-800 dark:text-slate-200 mb-1">Parameter Settings</h4>
-            <p>Set target values for environmental conditions. Your ESP32 will automatically adjust connected devices to maintain these targets based on the cloud configuration.</p>
-          </div>
-          <div>
-            <h4 className="text-slate-800 dark:text-slate-200 mb-1">Automation</h4>
-            <p>When parameter settings are saved, the system operates in automatic mode. Switch back to manual control anytime for direct device management through the dashboard override.</p>
-          </div>
-        </div>
-      </div>
-    </div>
+        const isActive = currentPage === item.id;
+        return (
+          <button
+            key={item.id}
+            onClick={() => onPageChange(item.id)}
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-lg transition-all whitespace-nowrap ${
+              isActive
+                ? 'bg-orange-500 dark:bg-orange-600 text-white shadow-md'
+                : 'bg-slate-50 dark:bg-slate-900 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-700'
+            }`}
+          >
+            {item.icon}
+            <span className="text-sm">{item.label}</span>
+          </button>
+        );
+      })}
+    </nav>
   );
 }
