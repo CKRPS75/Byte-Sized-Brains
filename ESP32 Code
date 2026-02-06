@@ -1,0 +1,133 @@
+#include <WiFi.h>
+#include <HTTPClient.h>
+#include <ArduinoJson.h>
+#include "DHT.h"
+
+// --- WiFi Credentials ---
+const char* ssid = "CKRPS75";
+const char* password = "Rushil@75";
+
+// --- Backend Endpoint ---
+// Using your PC's IPv4 address
+const String serverUrl = "http://192.168.29.185:5050/api/sync";
+
+// --- Pin Definitions ---
+#define DHTPIN 4
+#define DHTTYPE DHT22 // UPDATED: Changed from DHT11 to DHT22
+
+const int soilPin = 32;
+const int lightPin = 34;
+
+const int fanRelay = 13;
+const int pumpRelay = 22;
+const int misterRelay = 14; 
+const int lightRelay = 27; 
+
+DHT dht(DHTPIN, DHTTYPE);
+
+void setup() {
+  Serial.begin(115200);
+  dht.begin();
+
+  pinMode(fanRelay, OUTPUT);
+  pinMode(pumpRelay, OUTPUT);
+  pinMode(misterRelay, OUTPUT);
+  pinMode(lightRelay, OUTPUT);
+
+  // Initialize Relays to OFF (Ensure this matches your relay logic)
+  digitalWrite(fanRelay, HIGH);
+  digitalWrite(pumpRelay, HIGH);
+  digitalWrite(misterRelay, HIGH);
+  digitalWrite(lightRelay, HIGH);
+
+  WiFi.begin(ssid, password);
+  Serial.print("Connecting to WiFi");
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    Serial.print(".");
+  }
+  Serial.println("\n✅ WiFi Connected!");
+}
+
+void loop() {
+  if (WiFi.status() == WL_CONNECTED) {
+    // 1. Read All Sensors
+    float humidity = dht.readHumidity();
+    float temperature = dht.readTemperature();
+
+    // Mapping 12-bit Analog (0-4095) to Percentage (0-100)
+    int soilRaw = analogRead(soilPin);
+    int soilMoisture = map(soilRaw, 4095, 0, 0, 100);
+    soilMoisture = constrain(soilMoisture, 0, 100);
+
+    int lightRaw = analogRead(lightPin);
+    int sunlight = map(lightRaw, 0, 4095, 0, 100);
+    sunlight = constrain(sunlight, 0, 100);
+
+    // Fail-safe check
+    if (isnan(humidity) || isnan(temperature)) {
+      Serial.println(F("❌ DHT22 Sensor Error! Check wiring on Pin 4."));
+      delay(2000);
+      return;
+    }
+
+    // 2. Prepare JSON Payload for Node.js/MongoDB
+    StaticJsonDocument<256> doc;
+    doc["temperature"] = temperature;
+    doc["humidity"] = humidity;
+    doc["soil"] = soilMoisture;
+    doc["light"] = sunlight;
+
+    String jsonString;
+    serializeJson(doc, jsonString);
+
+    // 3. Send Sync Request
+    HTTPClient http;
+    http.begin(serverUrl);
+    http.addHeader("Content-Type", "application/json");
+
+    int httpResponseCode = http.POST(jsonString);
+
+    if (httpResponseCode > 0) {
+      String response = http.getString();
+      StaticJsonDocument<768> responseDoc;
+      deserializeJson(responseDoc, response);
+
+      // 4. Retrieve Config from Database
+      bool override = responseDoc["config"]["override"];
+      bool fanStatus = responseDoc["config"]["fanStatus"];
+      bool pumpStatus = responseDoc["config"]["pumpStatus"];
+      bool mistStatus = responseDoc["config"]["misterStatus"];
+      bool lightStatus = responseDoc["config"]["lightStatus"];
+      float tempLimit = responseDoc["config"]["tempLimit"];
+      int soilLimit = responseDoc["config"]["soilLimit"]; 
+      int sunlightLimit = responseDoc["config"]["sunlightLimit"];
+      int humidityLimit = responseDoc["config"]["humidityLimit"];
+
+      if (override) {
+        // --- MANUAL MODE ---
+        digitalWrite(fanRelay, fanStatus ? HIGH : LOW);
+        digitalWrite(pumpRelay, pumpStatus ? HIGH : LOW);
+        digitalWrite(misterRelay, mistStatus ? HIGH : LOW);
+        digitalWrite(lightRelay, lightStatus ? HIGH : LOW);
+        Serial.println(">> MODE: MANUAL");
+      } else {
+        // --- AUTO MODE ---
+        digitalWrite(fanRelay, (temperature > tempLimit) ? HIGH : LOW);
+        digitalWrite(pumpRelay, (soilMoisture < soilLimit) ? HIGH : LOW);
+        digitalWrite(lightRelay, (sunlight < sunlightLimit) ? HIGH : LOW);
+        digitalWrite(misterRelay, (humidity < humidityLimit) ? HIGH : LOW);
+        Serial.println(">> MODE: AUTO");
+      }
+
+      // Display correct decimal precision
+      Serial.printf("T:%.1f | H:%.1f | S:%d%% | L:%d%%\n", temperature, humidity, soilMoisture, sunlight);
+
+    } else {
+      Serial.print("❌ Sync Error: ");
+      Serial.println(httpResponseCode);
+    }
+    http.end();
+  }
+  delay(5000); 
+}
