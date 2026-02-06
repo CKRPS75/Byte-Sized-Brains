@@ -3,7 +3,8 @@ import axios from "axios";
 import { Login } from "./components/Login";
 import { Dashboard } from "./components/Dashboard";
 
-const API_BASE_URL = 'http://10.187.7.44:5050/api';
+// Use your current Hotspot IP
+const API_BASE_URL = 'http://10.145.71.44:5050/api';
 
 type UserRole = 'manager' | 'farmer' | null;
 
@@ -12,6 +13,7 @@ export default function App() {
   const [darkMode, setDarkMode] = useState(false);
   const [userRole, setUserRole] = useState<UserRole>(null);
 
+  // FIXED: State keys now match Backend sensors payload exactly
   const [greenhouseData, setGreenhouseData] = useState({
     sensors: { temperature: 0, humidity: 0, soil: 0, light: 0 },
     config: { 
@@ -29,17 +31,12 @@ export default function App() {
 
   useEffect(() => {
     const savedDarkMode = localStorage.getItem("darkMode");
-    if (savedDarkMode === "true") {
-      setDarkMode(true);
-    }
+    if (savedDarkMode === "true") setDarkMode(true);
   }, []);
 
   useEffect(() => {
-    if (darkMode) {
-      document.documentElement.classList.add("dark");
-    } else {
-      document.documentElement.classList.remove("dark");
-    }
+    if (darkMode) document.documentElement.classList.add("dark");
+    else document.documentElement.classList.remove("dark");
     localStorage.setItem("darkMode", darkMode.toString());
   }, [darkMode]);
 
@@ -49,9 +46,9 @@ export default function App() {
     const fetchStatus = async () => {
       try {
         const response = await axios.get(`${API_BASE_URL}/latest`);
-        setGreenhouseData(response.data);
+        if (response.data) setGreenhouseData(response.data);
       } catch (error) {
-        console.error("Backend sync failed. Check if Node.js is running at 10.187.7.44:5050");
+        console.error("Backend unreachable at http://10.145.71.44:5050");
       }
     };
 
@@ -78,18 +75,10 @@ export default function App() {
     setUserRole(null);
   };
 
-  const toggleDarkMode = () => {
-    setDarkMode(!darkMode);
-  };
+  const toggleDarkMode = () => setDarkMode(!darkMode);
 
   if (!isAuthenticated) {
-    return (
-      <Login
-        onLogin={handleLogin}
-        darkMode={darkMode}
-        toggleDarkMode={toggleDarkMode}
-      />
-    );
+    return <Login onLogin={handleLogin} darkMode={darkMode} toggleDarkMode={toggleDarkMode} />;
   }
 
   return (
@@ -98,7 +87,7 @@ export default function App() {
       darkMode={darkMode}
       toggleDarkMode={toggleDarkMode}
       data={greenhouseData} 
-      userRole={userRole} 
+      userRole={userRole || 'farmer'} 
       apiUrl={API_BASE_URL} 
     />
   );
