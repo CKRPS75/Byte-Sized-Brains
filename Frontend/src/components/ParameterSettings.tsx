@@ -1,5 +1,5 @@
-import { useState, useEffect } from "react";
-import axios from "axios"; // Necessary for cloud sync
+import { useState } from "react";
+import axios from "axios"; // Added for backend communication
 import {
   Thermometer,
   Droplets,
@@ -8,7 +8,7 @@ import {
   Save,
 } from "lucide-react";
 
-interface Parameter {
+export interface Parameter {
   id: string;
   name: string;
   icon: React.ReactNode;
@@ -22,117 +22,47 @@ interface Parameter {
 
 interface ParameterSettingsProps {
   darkMode: boolean;
-  config: any;   // Prop from Dashboard to track live settings
-  apiUrl: string; // Prop from Dashboard for backend location
+  parameters: Parameter[];
+  onUpdateParameter: (id: string, value: number) => void;
+  apiUrl: string; // Added: To send data to the correct backend endpoint
 }
 
 export function ParameterSettings({
   darkMode,
-  config,
-  apiUrl,
+  parameters,
+  onUpdateParameter,
+  apiUrl, // Destructured
 }: ParameterSettingsProps) {
-  const [parameters, setParameters] = useState<Parameter[]>([
-    {
-      id: 'temperature',
-      name: 'Temperature',
-      icon: <Thermometer className="w-5 h-5" />,
-      value: 25,
-      unit: '°C',
-      min: 10,
-      max: 60,
-      step: 0.5,
-      color: 'orange',
-    },
-    {
-      id: "humidity",
-      name: "Air Humidity",
-      icon: <Droplets className="w-5 h-5" />,
-      value: 60,
-      unit: "%",
-      min: 0,
-      max: 100,
-      step: 1,
-      color: "blue",
-    },
-    {
-      id: "soilMoisture",
-      name: "Soil Moisture",
-      icon: <Sprout className="w-5 h-5" />,
-      value: 50,
-      unit: "%",
-      min: 0,
-      max: 100,
-      step: 1,
-      color: "green",
-    },
-    {
-      id: "sunlight",
-      name: "Sunlight",
-      icon: <Sun className="w-5 h-5" />,
-      value: 70,
-      unit: "%",
-      min: 0,
-      max: 100,
-      step: 1,
-      color: "yellow",
-    },
-  ]);
-
   const [isSaving, setIsSaving] = useState(false);
 
-  // Sync with MongoDB without removing any state items
-  useEffect(() => {
-    if (config) {
-      setParameters(prev => prev.map(param => {
-        if (param.id === 'temperature') return { ...param, value: config.tempLimit || 31 };
-        if (param.id === 'soilMoisture') return { ...param, value: config.soilLimit || 30 };
-        // NECESSARY CHANGE: Syncing new humidity and sunlight limits
-        if (param.id === 'humidity') return { ...param, value: config.humidityLimit || 45 };
-        if (param.id === 'sunlight') return { ...param, value: config.sunlightLimit || 20 };
-        return param;
-      }));
-    }
-  }, [config]);
-
   const updateParameter = (id: string, value: number) => {
-    setParameters(
-      parameters.map((param) =>
-        param.id === id ? { ...param, value } : param,
-      ),
-    );
+    onUpdateParameter(id, value);
   };
 
   const saveParameters = async () => {
     setIsSaving(true);
 
-    // Extract only serializable data (Original logic preserved)
-    const parameterValues = parameters.map((param) => ({
-      id: param.id,
-      name: param.name,
-      value: param.value,
-      unit: param.unit,
-    }));
+    // Map the current local parameter IDs to the naming convention used in your MongoDB/Arduino logic
+    const configPayload = {
+      tempLimit: parameters.find(p => p.id === 'temperature')?.value,
+      humidityLimit: parameters.find(p => p.id === 'humidity')?.value,
+      soilLimit: parameters.find(p => p.id === 'soilMoisture')?.value,
+      sunlightLimit: parameters.find(p => p.id === 'sunlight')?.value,
+      override: false // Saving parameters usually implies returning to Auto mode
+    };
 
-    // NECESSARY CHANGE: Sending all 4 limits to the backend
     try {
-      const updatedConfig = {
-        ...config,
-        tempLimit: parameters.find(p => p.id === 'temperature')?.value,
-        soilLimit: parameters.find(p => p.id === 'soilMoisture')?.value,
-        humidityLimit: parameters.find(p => p.id === 'humidity')?.value,
-        sunlightLimit: parameters.find(p => p.id === 'sunlight')?.value,
-        override: false // Switch back to AUTO mode on save
-      };
-      await axios.post(`${apiUrl}/admin/config`, updatedConfig);
-      console.log("Saving parameters to Backend:", parameterValues);
+      // Send the bundled configuration to the Node.js server
+      await axios.post(`${apiUrl}/config`, configPayload);
+      console.log("Parameters successfully synced to backend:", configPayload);
     } catch (error) {
-      console.error("Cloud Save Failed:", error);
+      console.error("Failed to sync parameters to backend.");
+    } finally {
+      // Brief delay for visual feedback on the button
+      setTimeout(() => {
+        setIsSaving(false);
+      }, 8000);
     }
-
-    // Original timeout preserved
-    setTimeout(() => {
-      setIsSaving(false);
-    }, 1000);
   };
 
   const getColorClasses = (color: string) => {
@@ -176,8 +106,8 @@ export function ParameterSettings({
   return (
     <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm p-6 border border-slate-200 dark:border-slate-700">
       <div className="flex items-center justify-between mb-4">
-        <h3 className="text-slate-900 dark:text-white">
-          Parameter Settings
+        <h3 className="text-slate-900 dark:text-white font-semibold">
+          Target Thresholds
         </h3>
         <button
           onClick={saveParameters}
@@ -185,7 +115,7 @@ export function ParameterSettings({
           className="flex items-center gap-2 px-4 py-2 bg-green-500 hover:bg-green-600 dark:bg-green-600 dark:hover:bg-green-700 text-white rounded-lg transition-colors text-sm disabled:opacity-50 disabled:cursor-not-allowed"
         >
           <Save className="w-4 h-4" />
-          {isSaving ? "Saving..." : "Save Settings"}
+          {isSaving ? "Syncing..." : "Save to System"}
         </button>
       </div>
 
@@ -195,15 +125,15 @@ export function ParameterSettings({
           return (
             <div
               key={param.id}
-              className={`${colors.bg} border ${colors.border} rounded-lg p-4`}
+              className={`${colors.bg} border ${colors.border} rounded-lg p-4 transition-all`}
             >
               <div className="flex items-center gap-3 mb-3">
                 <div className={colors.text}>{param.icon}</div>
                 <div className="flex-1">
-                  <p className="text-sm text-slate-700 dark:text-slate-300">
+                  <p className="text-sm text-slate-700 dark:text-slate-300 font-medium">
                     {param.name}
                   </p>
-                  <p className={`${colors.text}`}>
+                  <p className={`${colors.text} font-bold text-lg`}>
                     {param.value}
                     {param.unit}
                   </p>
@@ -251,7 +181,7 @@ export function ParameterSettings({
                       parseFloat(e.target.value) || param.min,
                     )
                   }
-                  className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-offset-0 focus:ring-blue-500"
+                  className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
             </div>
@@ -261,10 +191,9 @@ export function ParameterSettings({
 
       <div className="mt-4 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
         <p className="text-sm text-blue-800 dark:text-blue-300">
-          <strong>Note:</strong> These parameters will be sent
-          to your ESP32 device when you click "Save Settings".
-          The device will attempt to maintain these target
-          values automatically.
+          <strong>System Logic:</strong> Saving these settings will update the 
+          Automation thresholds. The ESP32 will use these values to trigger 
+          Fans, Pumps, and Misters until you switch back to Manual Mode.
         </p>
       </div>
     </div>
