@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Lock, User, Moon, Sun } from "lucide-react";
+import { Lock, User, Moon, Sun, Info } from "lucide-react";
 
 interface LoginProps {
   onLogin: (username: string, password: string) => boolean;
@@ -22,13 +22,14 @@ export function Login({
     setError("");
     setIsLoading(true);
 
+    // Simulated network delay for smooth UI feel
     setTimeout(() => {
       const success = onLogin(username, password);
       if (!success) {
         setError("Invalid username or password");
       }
       setIsLoading(false);
-    }, 500);
+    }, 800);
   };
 
   return (
@@ -36,7 +37,7 @@ export function Login({
       {/* Dark mode toggle */}
       <button
         onClick={toggleDarkMode}
-        className="absolute top-6 right-6 p-3 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
+        className="absolute top-6 right-6 p-3 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors shadow-sm"
         aria-label="Toggle dark mode"
       >
         {darkMode ? (
@@ -52,11 +53,11 @@ export function Login({
           <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-orange-500 to-orange-600 rounded-2xl mb-4 shadow-lg">
             <Lock className="w-8 h-8 text-white" />
           </div>
-          <h1 className="text-slate-900 dark:text-white mb-2">
-            Automated Climate Control System
+          <h1 className="text-2xl font-bold text-slate-900 dark:text-white mb-2">
+            OmniClimate IoT Login
           </h1>
           <p className="text-slate-600 dark:text-slate-400">
-            Sign in to access your dashboard
+            Sign in to access your greenhouse dashboard
           </p>
         </div>
 
@@ -67,7 +68,7 @@ export function Login({
             <div>
               <label
                 htmlFor="username"
-                className="block text-sm text-slate-700 dark:text-slate-300 mb-2"
+                className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2"
               >
                 Username
               </label>
@@ -78,7 +79,7 @@ export function Login({
                   type="text"
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
-                  className="w-full pl-11 pr-4 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 dark:focus:ring-orange-400 focus:border-transparent text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500"
+                  className="w-full pl-11 pr-4 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 dark:focus:ring-orange-400 focus:border-transparent text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 transition-all"
                   placeholder="Enter your username"
                   required
                 />
@@ -89,7 +90,7 @@ export function Login({
             <div>
               <label
                 htmlFor="password"
-                className="block text-sm text-slate-700 dark:text-slate-300 mb-2"
+                className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2"
               >
                 Password
               </label>
@@ -100,7 +101,7 @@ export function Login({
                   type="password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="w-full pl-11 pr-4 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 dark:focus:ring-orange-400 focus:border-transparent text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500"
+                  className="w-full pl-11 pr-4 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 dark:focus:ring-orange-400 focus:border-transparent text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 transition-all"
                   placeholder="Enter your password"
                   required
                 />
@@ -109,7 +110,7 @@ export function Login({
 
             {/* Error Message */}
             {error && (
-              <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 px-4 py-3 rounded-lg text-sm">
+              <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 px-4 py-3 rounded-lg text-sm animate-in fade-in duration-300">
                 {error}
               </div>
             )}
@@ -118,11 +119,23 @@ export function Login({
             <button
               type="submit"
               disabled={isLoading}
-              className="w-full bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white py-3 rounded-lg transition-all shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white py-3 rounded-lg font-semibold transition-all shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {isLoading ? "Signing in..." : "Sign In"}
+              {isLoading ? "Validating..." : "Sign In"}
             </button>
           </form>
+
+          {/* ADDED: Role Access Info Section */}
+          <div className="mt-8 pt-6 border-t border-slate-200 dark:border-slate-700">
+            <div className="flex items-start gap-3 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-xl border border-blue-100 dark:border-blue-800">
+              <Info className="w-5 h-5 text-blue-500 shrink-0 mt-0.5" />
+              <div className="text-xs space-y-1 text-blue-800 dark:text-blue-300">
+                <p className="font-bold">System Role Credentials:</p>
+                <p><strong>Manager:</strong> admin / admin (Full Access)</p>
+                <p><strong>Farmer:</strong> farmer / farmer (Live & Control only)</p>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
