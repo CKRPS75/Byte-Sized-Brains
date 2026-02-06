@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import axios from 'axios';
 import { Fan, Droplet, Wind, Lightbulb, Power } from 'lucide-react';
 
@@ -12,58 +12,83 @@ interface ControlDevice {
 
 interface ControlPanelProps {
   darkMode: boolean;
-  config: any;
-  apiUrl: string;
+  config: any;   // Added: Live configuration from App.tsx
+  apiUrl: string; // Added: Backend URL
 }
 
 export function ControlPanel({ darkMode, config, apiUrl }: ControlPanelProps) {
+  // Use the 'override' status from the database as the source of truth for Manual Mode
+  const isManualMode = config.override;
+
   const [devices, setDevices] = useState<ControlDevice[]>([
-    { id: 'fan', name: 'Fan', icon: <Fan className="w-5 h-5" />, status: false, color: 'orange' },
-    { id: 'pump', name: 'Water Pump', icon: <Droplet className="w-5 h-5" />, status: false, color: 'green' },
-    { id: 'humidifier', name: 'Humidifier', icon: <Wind className="w-5 h-5" />, status: false, color: 'blue' },
-    { id: 'uvlights', name: 'UV Lights', icon: <Lightbulb className="w-5 h-5" />, status: false, color: 'yellow' },
+    {
+      id: 'fanStatus',
+      name: 'Fan',
+      icon: <Fan className={`w-5 h-5 ${config.fanStatus ? 'animate-spin' : ''}`} />,
+      status: config.fanStatus,
+      color: 'orange',
+    },
+    {
+      id: 'pumpStatus',
+      name: 'Water Pump',
+      icon: <Droplet className="w-5 h-5" />,
+      status: config.pumpStatus,
+      color: 'green',
+    },
+    {
+      id: 'misterStatus',
+      name: 'Humidifier',
+      icon: <Wind className="w-5 h-5" />,
+      status: config.misterStatus,
+      color: 'blue',
+    },
+    {
+      id: 'lightStatus',
+      name: 'UV Lights',
+      icon: <Lightbulb className="w-5 h-5" />,
+      status: config.lightStatus,
+      color: 'yellow',
+    },
   ]);
 
-  // Sync internal device state with MongoDB config
+  // Sync internal device state whenever the global config (from App.tsx) updates
   useEffect(() => {
-    if (config) {
-      setDevices(prev => prev.map(device => {
-        if (device.id === 'fan') return { ...device, status: config.fanStatus };
-        if (device.id === 'pump') return { ...device, status: config.pumpStatus };
-        if (device.id === 'humidifier') return { ...device, status: config.misterStatus }; // Mapping to misterStatus
-        if (device.id === 'uvlights') return { ...device, status: config.lightStatus };   // Mapping to lightStatus
-        return device;
-      }));
-    }
+    setDevices([
+      { id: 'fanStatus', name: 'Fan', icon: <Fan className={`w-5 h-5 ${config.fanStatus ? 'animate-spin' : ''}`} />, status: config.fanStatus, color: 'orange' },
+      { id: 'pumpStatus', name: 'Water Pump', icon: <Droplet className="w-5 h-5" />, status: config.pumpStatus, color: 'green' },
+      { id: 'misterStatus', name: 'Humidifier', icon: <Wind className="w-5 h-5" />, status: config.misterStatus, color: 'blue' },
+      { id: 'lightStatus', name: 'UV Lights', icon: <Lightbulb className="w-5 h-5" />, status: config.lightStatus, color: 'yellow' },
+    ]);
   }, [config]);
 
-  const updateSystemConfig = async (updatedFields: any) => {
+  const toggleDevice = async (id: string) => {
+    if (!isManualMode) return;
+    
+    // Find the current status and flip it
+    const currentDevice = devices.find(d => d.id === id);
+    if (!currentDevice) return;
+
     try {
-      // Ensure we send all fields so MongoDB findOneAndUpdate works correctly
-      const fullNewConfig = { ...config, ...updatedFields };
-      await axios.post(`${apiUrl}/admin/config`, fullNewConfig);
+      // Send update to Node.js backend
+      await axios.post(`${apiUrl}/config`, {
+        [id]: !currentDevice.status
+      });
     } catch (error) {
-      console.error("Failed to update hardware status:", error);
+      console.error(`Failed to toggle ${id}`);
     }
   };
 
-  const toggleDevice = (id: string) => {
-    if (!config.override) {
-      alert("Please enable 'Manual Override' first to control devices!");
-      return;
+  const toggleManualMode = async () => {
+    try {
+      // Toggle the 'override' flag in the database
+      await axios.post(`${apiUrl}/config`, {
+        override: !isManualMode
+      });
+    } catch (error) {
+      console.error("Failed to toggle Manual Mode");
     }
-
-    const device = devices.find(d => d.id === id);
-    if (!device) return;
-
-    // Fixed Mapping: Matches your server.js schema fields
-    if (id === 'fan') updateSystemConfig({ fanStatus: !device.status });
-    if (id === 'pump') updateSystemConfig({ pumpStatus: !device.status });
-    if (id === 'humidifier') updateSystemConfig({ misterStatus: !device.status });
-    if (id === 'uvlights') updateSystemConfig({ lightStatus: !device.status });
   };
 
-  // ... (getColorClasses function remains the same)
   const getColorClasses = (color: string, status: boolean) => {
     const colors: Record<string, { bg: string; border: string; text: string; button: string; buttonHover: string }> = {
       orange: {
@@ -100,35 +125,47 @@ export function ControlPanel({ darkMode, config, apiUrl }: ControlPanelProps) {
 
   return (
     <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm p-6 border border-slate-200 dark:border-slate-700">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
-        <h3 className="text-slate-900 dark:text-white">Manual Device Control</h3>
-        <button 
-          onClick={() => updateSystemConfig({ override: !config.override })}
-          className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all ${config.override ? 'bg-red-100 text-red-700 border border-red-200' : 'bg-slate-100 text-slate-700 border border-slate-200'}`}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+        <div>
+          <h3 className="text-slate-900 dark:text-white font-semibold">Device Control</h3>
+          <p className="text-sm text-slate-500 dark:text-slate-400">
+            {isManualMode ? 'Manual control enabled' : 'System is running in automatic mode'}
+          </p>
+        </div>
+        
+        <button
+          onClick={toggleManualMode}
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all font-medium ${
+            isManualMode 
+              ? 'bg-orange-500 text-white shadow-md hover:bg-orange-600' 
+              : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600'
+          }`}
         >
           <Power className="w-4 h-4" />
-          {config.override ? "Manual Override: ON" : "Enable Manual Override"}
+          {isManualMode ? 'Manual Mode: ON' : 'Manual Mode: OFF'}
         </button>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className={`grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 transition-opacity duration-300 ${!isManualMode ? 'opacity-60 pointer-events-none grayscale-[0.5]' : ''}`}>
         {devices.map((device) => {
           const colors = getColorClasses(device.color, device.status);
           return (
             <div
               key={device.id}
-              className={`${colors.bg} border ${colors.border} rounded-lg p-4 transition-all ${!config.override && 'opacity-60 cursor-not-allowed'}`}
+              className={`${colors.bg} border ${colors.border} rounded-lg p-4 transition-all`}
             >
               <div className="flex items-center justify-between mb-3">
-                <div className={colors.text}>{device.icon}</div>
-                <span className={`text-xs px-2 py-1 rounded-full ${device.status ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-600'}`}>
+                <div className={colors.text}>
+                  {device.icon}
+                </div>
+                <span className={`text-xs px-2 py-1 rounded-full ${device.status ? 'bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-300' : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-400'}`}>
                   {device.status ? 'ON' : 'OFF'}
                 </span>
               </div>
               <p className="text-sm text-slate-700 dark:text-slate-300 mb-3">{device.name}</p>
               <button
-                disabled={!config.override}
                 onClick={() => toggleDevice(device.id)}
+                disabled={!isManualMode}
                 className={`w-full py-2 rounded-lg transition-colors text-white text-sm ${colors.button} ${colors.buttonHover} disabled:cursor-not-allowed`}
               >
                 {device.status ? 'Turn Off' : 'Turn On'}
@@ -137,6 +174,13 @@ export function ControlPanel({ darkMode, config, apiUrl }: ControlPanelProps) {
           );
         })}
       </div>
+      
+      {!isManualMode && (
+        <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800 rounded-lg flex items-center gap-2 text-sm text-blue-700 dark:text-blue-300">
+          <div className="w-2 h-2 rounded-full bg-blue-500 animate-pulse"></div>
+          Automatic control active. Enable Manual Mode to override.
+        </div>
+      )}
     </div>
   );
 }
