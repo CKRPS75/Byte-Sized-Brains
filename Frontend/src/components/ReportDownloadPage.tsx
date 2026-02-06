@@ -3,7 +3,7 @@ import { FileSpreadsheet, TrendingUp, Calendar, BarChart3 } from 'lucide-react';
 
 interface ReportDownloadPageProps {
   darkMode: boolean;
-  apiUrl: string; // Added to receive the backend URL from Dashboard.tsx
+  apiUrl: string; // Added: Passed from Dashboard.tsx to enable backend communication
 }
 
 export function ReportDownloadPage({ darkMode, apiUrl }: ReportDownloadPageProps) {
@@ -12,7 +12,7 @@ export function ReportDownloadPage({ darkMode, apiUrl }: ReportDownloadPageProps
       {/* Statistics Download */}
       <div>
         <h2 className="text-slate-900 dark:text-white mb-4">Export Sensor Data</h2>
-        {/* Passing apiUrl so StatisticsDownload can trigger the CSV export route */}
+        {/* Pass the apiUrl down to the child component that handles the actual download */}
         <StatisticsDownload darkMode={darkMode} apiUrl={apiUrl} />
       </div>
 
@@ -26,7 +26,7 @@ export function ReportDownloadPage({ darkMode, apiUrl }: ReportDownloadPageProps
             <h3 className="text-slate-900 dark:text-white">Detailed Data</h3>
           </div>
           <p className="text-sm text-slate-600 dark:text-slate-400">
-            Export includes all sensor readings with timestamps from MongoDB, ready for analysis in Excel or other tools.
+            Export includes all sensor readings with timestamps, ready for analysis in Excel or other tools.
           </p>
         </div>
 
@@ -38,7 +38,7 @@ export function ReportDownloadPage({ darkMode, apiUrl }: ReportDownloadPageProps
             <h3 className="text-slate-900 dark:text-white">Statistics</h3>
           </div>
           <p className="text-sm text-slate-600 dark:text-slate-400">
-            Automatic calculations of averages, min/max values, and trends for each sensor parameter based on historical logs.
+            Automatic calculations of averages, min/max values, and trends for each sensor parameter.
           </p>
         </div>
 
@@ -50,7 +50,7 @@ export function ReportDownloadPage({ darkMode, apiUrl }: ReportDownloadPageProps
             <h3 className="text-slate-900 dark:text-white">Date Range</h3>
           </div>
           <p className="text-sm text-slate-600 dark:text-slate-400">
-            Choose from predefined ranges or select custom dates to export exactly the data you need from your database.
+            Choose from predefined ranges or select custom dates to export exactly the data you need.
           </p>
         </div>
       </div>
