@@ -27,7 +27,7 @@ interface LiveFeedProps {
 export function LiveFeed({ sensorData, historicalData, darkMode }: LiveFeedProps) {
   return (
     <div className="space-y-8">
-      {/* Sensor Cards Grid */}
+      {/* Sensor Cards Grid - Real-time Data Mapping */}
       <div>
         <h2 className="text-slate-900 dark:text-white mb-4">Current Readings</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -78,9 +78,9 @@ export function LiveFeed({ sensorData, historicalData, darkMode }: LiveFeedProps
         </div>
       </div>
 
-      {/* Charts */}
+      {/* Charts - Visualizing Backend Historical Logs */}
       <div>
-        <h2 className="text-slate-900 dark:text-white mb-4">Graphs</h2>
+        <h2 className="text-slate-900 dark:text-white mb-4">System Graphs</h2>
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <ChartDisplay
             title="Temperature & Humidity"
@@ -101,23 +101,28 @@ export function LiveFeed({ sensorData, historicalData, darkMode }: LiveFeedProps
         </div>
       </div>
 
-      {/* ESP32 Integration Info */}
+      {/* ESP32 Integration Info - Kept for Troubleshooting */}
       <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm p-6 border border-slate-200 dark:border-slate-700">
-        <h3 className="text-slate-900 dark:text-white mb-3">ESP32 Integration Guide</h3>
+        <div className="flex items-center gap-2 mb-3">
+            <div className="w-2 h-2 rounded-full bg-blue-500 animate-pulse"></div>
+            <h3 className="text-slate-900 dark:text-white">Active Connection Point</h3>
+        </div>
         <div className="space-y-2 text-sm text-slate-600 dark:text-slate-400">
-          <p>To connect your ESP32, configure it to send HTTP POST requests to this endpoint:</p>
+          <p>Your ESP32 is currently sending data to your server at <strong>10.187.7.44</strong>. The web dashboard receives updates via the following schema:</p>
           <code className="block bg-slate-100 dark:bg-slate-900 p-3 rounded mt-2 text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-700">
-            POST /api/sensor-data<br/>
+            GET /api/latest<br/>
             Content-Type: application/json<br/>
             <br/>
             {JSON.stringify({
-              temperature: 24.5,
-              airHumidity: 65,
-              soilMoisture: 42,
-              sunlight: 75
+              sensors: {
+                temperature: sensorData.temperature,
+                humidity: sensorData.airHumidity,
+                soil: sensorData.soilMoisture,
+                light: sensorData.sunlight
+              }
             }, null, 2)}
           </code>
-          <p className="mt-3">Or use WebSocket connection for real-time streaming at: <code className="bg-slate-100 dark:bg-slate-900 px-2 py-1 rounded border border-slate-200 dark:border-slate-700">ws://YOUR_SERVER/sensor-stream</code></p>
+          <p className="mt-3 italic text-xs">Note: Ensure your ESP32 and this PC remain on the <strong>Galaxy A14 5G 8BC8</strong> hotspot for data to sync.</p>
         </div>
       </div>
     </div>
