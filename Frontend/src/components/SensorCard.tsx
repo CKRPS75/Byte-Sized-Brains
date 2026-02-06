@@ -41,34 +41,41 @@ const colorStyles = {
 
 export function SensorCard({ title, value, unit, icon, color, min, max, current, darkMode }: SensorCardProps) {
   const styles = colorStyles[color];
+  
+  // Logic: Calculate the progress percentage for the visual bar based on current ESP32 readings
   const percentage = ((current - min) / (max - min)) * 100;
 
   return (
-    <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm p-6 border border-slate-200 dark:border-slate-700 hover:shadow-md dark:hover:shadow-slate-900/50 transition-shadow">
+    <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm p-6 border border-slate-200 dark:border-slate-700 hover:shadow-md dark:hover:shadow-slate-900/50 transition-all duration-300">
       <div className="flex items-start justify-between mb-4">
         <div>
-          <p className="text-sm text-slate-600 dark:text-slate-400 mb-1">{title}</p>
+          <p className="text-sm font-medium text-slate-600 dark:text-slate-400 mb-1">{title}</p>
           <div className="flex items-baseline gap-1">
-            <span className="text-slate-900 dark:text-white">{value}</span>
-            <span className="text-sm text-slate-500 dark:text-slate-400">{unit}</span>
+            {/* Real-time value from the backend */}
+            <span className="text-2xl font-bold text-slate-900 dark:text-white">{value}</span>
+            <span className="text-sm font-medium text-slate-500 dark:text-slate-400">{unit}</span>
           </div>
         </div>
-        <div className={`${styles.bg} ${styles.text} p-3 rounded-lg border ${styles.border}`}>
+        <div className={`${styles.bg} ${styles.text} p-3 rounded-lg border ${styles.border} shadow-sm`}>
           {icon}
         </div>
       </div>
       
-      {/* Progress bar */}
-      <div className="w-full bg-slate-100 dark:bg-slate-700 rounded-full h-2 overflow-hidden">
+      {/* Progress bar: Dynamically updates as sensor data changes */}
+      <div className="w-full bg-slate-100 dark:bg-slate-700 rounded-full h-2 overflow-hidden shadow-inner">
         <div
-          className={`${styles.progress} h-full rounded-full transition-all duration-500 ease-out`}
+          className={`${styles.progress} h-full rounded-full transition-all duration-1000 ease-in-out`}
           style={{ width: `${Math.min(100, Math.max(0, percentage))}%` }}
         />
       </div>
       
       <div className="flex justify-between mt-2">
-        <span className="text-xs text-slate-500 dark:text-slate-400">{min}{unit}</span>
-        <span className="text-xs text-slate-500 dark:text-slate-400">{max}{unit}</span>
+        <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+          MIN: {min}{unit}
+        </span>
+        <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+          MAX: {max}{unit}
+        </span>
       </div>
     </div>
   );
